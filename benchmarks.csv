@@ -1,2 +1,3 @@
 hardware,cpu,ram_gb,model,quant,ram_mb,tokens_per_s,ctx_size,repo
 "eMachines E727","Pentium T4500 2.1GHz",4,"Qwen2.5-1.5B-Instruct","Q4_K_M",145,1.0,32768,"e727-local-ai"
+"eMachines E727","Pentium T4500 2.1GHz",4,"Qwen2.5-1.5B-Instruct","Q4_K_M",145,1.0,32768,"e727-local-ai"
