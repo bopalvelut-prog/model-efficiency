@@ -74,39 +74,59 @@ def get_intelligency_score():
             print("Invalid input. Please enter a number.")
 
 
+def pull_model(model_name):
+    """Pulls a model from Ollama."""
+    print(f"\n📥 Pulling {model_name}...")
+    try:
+        response = requests.post(f"{OLLAMA_API_BASE_URL}/pull", json={"name": model_name, "stream": False})
+        response.raise_for_status()
+        print(f"✅ Successfully pulled {model_name}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to pull {model_name}: {e}")
+        return False
+
+
 def suggest_quantization(model_name, tokens_per_second):
     """Suggests a higher or lower quantization based on speed threshold."""
     if tokens_per_second is None:
-        return "N/A"
+        return "N/A", None
 
     quants = ["q2_K", "q3_K_S", "q3_K_M", "q3_K_L", "q4_0", "q4_K_S", "q4_K_M", "q5_0", "q5_K_S", "q5_K_M", "q6_K", "q8_0", "fp16"]
     
     current_quant = None
     base_name = model_name
     for q in quants:
-        if q in model_name.lower():
+        if q.lower() in model_name.lower():
             current_quant = q
-            base_name = model_name.lower().split(q)[0].rstrip(":-")
+            if "-" + q.lower() in model_name.lower():
+                base_name = model_name.lower().split("-" + q.lower())[0]
+            elif ":" + q.lower() in model_name.lower():
+                base_name = model_name.lower().split(":" + q.lower())[0]
             break
     
-    # If no explicit quant found, assume q4_K_M as a common baseline for suggestions
+    # If no explicit quant found, assume we suggest based on base name
     if not current_quant:
         if tokens_per_second < 5:
-            return "Try q3_K_M or q2_K"
+            suggested = "q3_K_M"
+            return f"Too slow. Try {suggested}", f"{model_name}-{suggested}"
         else:
-            return "Try q6_K or q8_0"
+            suggested = "q8_0"
+            return f"Fast. Try {suggested}", f"{model_name}-{suggested}"
 
     idx = quants.index(current_quant)
     if tokens_per_second < 5:
         if idx > 0:
-            return f"Too slow (<5t/s). Try {quants[idx-1]}"
+            suggested = quants[idx-1]
+            return f"Too slow (<5t/s). Try {suggested}", f"{base_name}-{suggested}"
         else:
-            return "Too slow, but already at lowest quantization."
+            return "Too slow, but already at lowest quantization.", None
     else:
         if idx < len(quants) - 1:
-            return f"Fast (>=5t/s). Try {quants[idx+1]} for better quality"
+            suggested = quants[idx+1]
+            return f"Fast (>=5t/s). Try {suggested} for quality", f"{base_name}-{suggested}"
         else:
-            return "Fast, and already at highest quantization."
+            return "Fast, and already at highest quantization.", None
 
 
 def calculate_combined_efficiency(results, w_ts, w_is, w_ms):
@@ -149,7 +169,7 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms):
             (normalized_ts * w_ts) + (normalized_is * w_is) + (normalized_ms * w_ms)
         )
 
-        suggestion = suggest_quantization(model_name, ts)
+        suggestion_text, suggested_tag = suggest_quantization(model_name, ts)
 
         processed_results.append(
             {
@@ -161,7 +181,8 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms):
                 "normalized_is": normalized_is,
                 "normalized_ms": normalized_ms,
                 "combined_efficiency_score": combined_efficiency_score,
-                "suggestion": suggestion
+                "suggestion": suggestion_text,
+                "suggested_tag": suggested_tag
             }
         )
     return processed_results
@@ -257,6 +278,7 @@ def main():
         processed_results, key=lambda x: x["combined_efficiency_score"], reverse=True
     )
 
+    suggested_models = []
     for res in processed_results_sorted:
         ts_str = (
             f"{res['tokens_per_second']:.2f}"
@@ -280,12 +302,31 @@ def main():
         )
         combined_str = f"{res['combined_efficiency_score']:.2f}"
         suggestion = res.get("suggestion", "N/A")
+        
+        if res.get("suggested_tag"):
+            suggested_models.append(res["suggested_tag"])
 
         print(
             f"{res['model_name']:<25} {ts_str:<12} {ms_str:<10} {is_str:<8} {combined_str:<10} {suggestion}"
         )
 
     print("\n--- End of Report ---")
+
+    if suggested_models:
+        print("\n--- Model Downloader ---")
+        print("Suggested models for download:")
+        for idx, m in enumerate(suggested_models):
+            print(f"[{idx+1}] {m}")
+        
+        choice = input("\nEnter model numbers to download (e.g. 1,3) or Enter to skip: ")
+        if choice:
+            try:
+                indices = [int(i.strip()) - 1 for i in choice.split(",")]
+                for idx in indices:
+                    if 0 <= idx < len(suggested_models):
+                        pull_model(suggested_models[idx])
+            except ValueError:
+                print("Invalid input. Skipping downloads.")
 
 
 if __name__ == "__main__":
