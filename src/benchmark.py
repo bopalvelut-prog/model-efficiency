@@ -45,7 +45,7 @@ def get_total_ram():
     """Get total RAM in GB."""
     return round(psutil.virtual_memory().total / (1024**3), 1)
 
-def run_benchmark():
+def run_benchmark(dry_run=False):
     """Run prima.cpp benchmark and parse output."""
     if not BINARY_PATH.exists():
         print(f"❌ Binary not found: {BINARY_PATH}")
@@ -55,31 +55,43 @@ def run_benchmark():
         print(f"❌ Model not found: {MODEL_PATH}")
         return None
 
-    print(f"🚀 Benchmarking {MODEL_PATH.name}...")
+    print(f"🚀 Benchmarking {MODEL_PATH.name} (this may take up to 20 minutes on old hardware)...")
     
-    # Use a fixed prompt and max tokens
     cmd = [
         str(BINARY_PATH),
         "-m", str(MODEL_PATH),
-        "-p", "Why is the sky blue? Answer in 50 words.",
-        "-n", "128",
-        "-ngl", "0",
-        "--log-disable"
+        "-p", "Hi",
+        "-n", "32", # Even fewer tokens for testing
+        "-ngl", "0"
     ]
     
     start_time = time.time()
     try:
-        # prima.cpp outputs benchmark info to stderr or stdout
-        # We need to capture everything
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        # Stream output if dry_run is true
+        if dry_run:
+            print("--- LOGS START ---")
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            output_lines = []
+            for line in process.stdout:
+                print(line, end="")
+                output_lines.append(line)
+            process.wait(timeout=1200) # 20 minute timeout
+            output = "".join(output_lines)
+            print("--- LOGS END ---")
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
+            output = result.stdout + result.stderr
+        
         end_time = time.time()
         
-        output = result.stdout + result.stderr
-        
         # Search for tokens per second in prima.cpp / llama.cpp output
-        # Format usually: "llama_print_timings:        eval time =  ... ( ... ms per token, ... tokens per second)"
+        # Format: "llama_perf_context_print:        eval time =  ... ( ... ms per token,     0.04 tokens per second)"
         tps_match = re.search(r"(\d+\.\d+) tokens per second", output)
-        ram_match = re.search(r"total system memory = (\d+\.\d+) MiB", output)
+        
+        # If tps_match failed, try to parse from the llama_perf_context_print line specifically
+        if not tps_match:
+            # Look for: "eval time = ... / ... runs ( ... ms per token, ... tokens per second)"
+            tps_match = re.search(r"eval time = .*? (\d+\.\d+) tokens per second", output)
         
         tps = float(tps_match.group(1)) if tps_match else 0.0
         
@@ -128,12 +140,23 @@ def git_commit():
     except Exception as e:
         print(f"⚠️ Git push failed: {e}")
 
+import sys
+
 def main():
-    result = run_benchmark()
+    dry_run = "--dry-run" in sys.argv
+    
+    result = run_benchmark(dry_run=dry_run)
     if result:
-        print(f"📈 Result: {result['tokens_per_s']} tok/s")
-        save_to_csv(result)
-        git_commit()
+        print("\n--- Benchmark Results ---")
+        for key, value in result.items():
+            print(f"{key}: {value}")
+        print("-------------------------\n")
+        
+        if dry_run:
+            print("🧪 Dry-run mode: skipping CSV save and Git push.")
+        else:
+            save_to_csv(result)
+            git_commit()
 
 if __name__ == "__main__":
     main()
