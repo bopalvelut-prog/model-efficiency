@@ -1,6 +1,20 @@
-# Model Efficiency Benchmarks
+# Model Efficiency Benchmarks 📈
 
 **Small models → Old hardware → Real benchmarks**
+
+## 🤖 Zero-Human Automation
+We follow the **bopalvelut-prog** principle of automation. You can now run the benchmark with zero human intervention:
+
+```bash
+python3 src/benchmark.py
+```
+
+This script will:
+1.  **Auto-detect** your hardware (CPU, RAM, Model name).
+2.  **Run** a standardized inference test using `prima.cpp`.
+3.  **Calculate** tokens per second and efficiency.
+4.  **Save** the results to `benchmarks.csv`.
+5.  **Push** the updates directly to GitHub.
 
 ## Current Records
 | Hardware | CPU | RAM | Model | Speed | RAM | Link |

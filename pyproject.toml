@@ -1,0 +1,11 @@
+[project]
+name = "model-efficiency"
+version = "0.1.0"
+description = "Automated AI Model Efficiency Benchmarking for Low-Resource Clusters."
+authors = [{ name = "bopalvelut-prog developers" }]
+dependencies = [
+    "psutil>=5.9.0",
+]
+
+[project.scripts]
+benchmark = "src.benchmark:main"
