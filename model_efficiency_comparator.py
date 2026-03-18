@@ -74,6 +74,41 @@ def get_intelligency_score():
             print("Invalid input. Please enter a number.")
 
 
+def suggest_quantization(model_name, tokens_per_second):
+    """Suggests a higher or lower quantization based on speed threshold."""
+    if tokens_per_second is None:
+        return "N/A"
+
+    quants = ["q2_K", "q3_K_S", "q3_K_M", "q3_K_L", "q4_0", "q4_K_S", "q4_K_M", "q5_0", "q5_K_S", "q5_K_M", "q6_K", "q8_0", "fp16"]
+    
+    current_quant = None
+    base_name = model_name
+    for q in quants:
+        if q in model_name.lower():
+            current_quant = q
+            base_name = model_name.lower().split(q)[0].rstrip(":-")
+            break
+    
+    # If no explicit quant found, assume q4_K_M as a common baseline for suggestions
+    if not current_quant:
+        if tokens_per_second < 5:
+            return "Try q3_K_M or q2_K"
+        else:
+            return "Try q6_K or q8_0"
+
+    idx = quants.index(current_quant)
+    if tokens_per_second < 5:
+        if idx > 0:
+            return f"Too slow (<5t/s). Try {quants[idx-1]}"
+        else:
+            return "Too slow, but already at lowest quantization."
+    else:
+        if idx < len(quants) - 1:
+            return f"Fast (>=5t/s). Try {quants[idx+1]} for better quality"
+        else:
+            return "Fast, and already at highest quantization."
+
+
 def calculate_combined_efficiency(results, w_ts, w_is, w_ms):
     """Calculates normalized token speed, intelligency, model size, and combined efficiency."""
     if not results:
@@ -114,6 +149,8 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms):
             (normalized_ts * w_ts) + (normalized_is * w_is) + (normalized_ms * w_ms)
         )
 
+        suggestion = suggest_quantization(model_name, ts)
+
         processed_results.append(
             {
                 "model_name": model_name,
@@ -124,6 +161,7 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms):
                 "normalized_is": normalized_is,
                 "normalized_ms": normalized_ms,
                 "combined_efficiency_score": combined_efficiency_score,
+                "suggestion": suggestion
             }
         )
     return processed_results
@@ -208,10 +246,10 @@ def main():
 
     print("\n--- Results Summary ---")
     print(
-        f"{'Model':<25} {'Tokens/Sec':<12} {'Size':<10} {'Intell.':<8} {'Norm TS':<9} {'Norm IS':<9} {'Norm MS':<9} {'Combined':<10}"
+        f"{'Model':<25} {'Tokens/Sec':<12} {'Size':<10} {'Intell.':<8} {'Combined':<10} {'Recommendation'}"
     )
     print(
-        f"{'-' * 25:<25} {'-' * 12:<12} {'-' * 10:<10} {'-' * 8:<8} {'-' * 9:<9} {'-' * 9:<9} {'-' * 9:<9} {'-' * 10:<10}"
+        f"{'-' * 25:<25} {'-' * 12:<12} {'-' * 10:<10} {'-' * 8:<8} {'-' * 10:<10} {'-' * 30}"
     )
 
     # Sort results by combined efficiency score in descending order
@@ -240,13 +278,11 @@ def main():
             if res["intelligency_score"] is not None
             else "N/A"
         )
-        norm_ts_str = f"{res['normalized_ts']:.2f}"
-        norm_is_str = f"{res['normalized_is']:.2f}"
-        norm_ms_str = f"{res['normalized_ms']:.2f}"
         combined_str = f"{res['combined_efficiency_score']:.2f}"
+        suggestion = res.get("suggestion", "N/A")
 
         print(
-            f"{res['model_name']:<25} {ts_str:<12} {ms_str:<10} {is_str:<8} {norm_ts_str:<9} {norm_is_str:<9} {norm_ms_str:<9} {combined_str:<10}"
+            f"{res['model_name']:<25} {ts_str:<12} {ms_str:<10} {is_str:<8} {combined_str:<10} {suggestion}"
         )
 
     print("\n--- End of Report ---")
