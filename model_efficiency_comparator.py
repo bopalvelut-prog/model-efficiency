@@ -3,26 +3,26 @@ import json
 import argparse
 import time
 
-OLLAMA_API_BASE_URL = "http://localhost:11434/api"
+API_BASE_URL = "http://localhost:11434/api"
 
 
-def list_ollama_models():
-    """Lists available Ollama models with their sizes."""
+def list_compatible_models():
+    """Lists available (OpenAI)-compatible models with their sizes."""
     try:
-        response = requests.get(f"{OLLAMA_API_BASE_URL}/tags")
+        response = requests.get(f"{API_BASE_URL}/tags")
         response.raise_for_status()
         models = []
         for m in response.json()["models"]:
             models.append({"name": m["name"], "size": m.get("size", 0)})
         return models
     except requests.exceptions.RequestException as e:
-        print(f"Error connecting to Ollama: {e}")
-        print("Please ensure Ollama is running.")
+        print(f"Error connecting to (OpenAI)-compatible API: {e}")
+        print("Please ensure your local inference engine is running.")
         return []
 
 
 def chat_with_model(model_name, prompt):
-    """Sends a prompt to an Ollama model and returns response and metrics."""
+    """Sends a prompt to a (OpenAI)-compatible model and returns response and metrics."""
     try:
         data = {
             "model": model_name,
@@ -30,7 +30,7 @@ def chat_with_model(model_name, prompt):
             "stream": False,  # We want the full response and metrics at once
         }
         start_time = time.time()
-        response = requests.post(f"{OLLAMA_API_BASE_URL}/generate", json=data)
+        response = requests.post(f"{API_BASE_URL}/generate", json=data)
         response.raise_for_status()
         end_time = time.time()
 
@@ -38,8 +38,7 @@ def chat_with_model(model_name, prompt):
 
         full_response = response_data.get("response", "")
 
-        # Ollama's API provides metrics in the 'eval_duration' and 'eval_count' fields
-        # which are part of the top-level response for non-streaming requests.
+        # API provides metrics in eval_duration and eval_count fields
         eval_duration = response_data.get("eval_duration", 0)  # Nanoseconds
         eval_count = response_data.get("eval_count", 0)  # Tokens generated
 
@@ -116,7 +115,36 @@ def get_security_score(model_name):
 
 
 def pull_model(model_name):
-...
+    """Pulls a model from the (OpenAI)-compatible registry."""
+    print(f"\n📥 Pulling {model_name}...")
+    try:
+        response = requests.post(f"{API_BASE_URL}/pull", json={"name": model_name, "stream": False})
+        response.raise_for_status()
+        print(f"✅ Successfully pulled {model_name}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to pull {model_name}: {e}")
+        return False
+
+
+def suggest_quantization(model_name, tokens_per_second):
+    """Suggests a higher or lower quantization based on speed threshold."""
+    if tokens_per_second is None:
+        return "N/A", None
+
+    quants = ["q2_K", "q3_K_S", "q3_K_M", "q3_K_L", "q4_0", "q4_K_S", "q4_K_M", "q5_0", "q5_K_S", "q5_K_M", "q6_K", "q8_0", "fp16"]
+    
+    current_quant = None
+    base_name = model_name
+    for q in quants:
+        if q.lower() in model_name.lower():
+            current_quant = q
+            if "-" + q.lower() in model_name.lower():
+                base_name = model_name.lower().split("-" + q.lower())[0]
+            elif ":" + q.lower() in model_name.lower():
+                base_name = model_name.lower().split(":" + q.lower())[0]
+            break
+    
     # If no explicit quant found, assume we suggest based on base name
     if not current_quant:
         if tokens_per_second < 5:
@@ -183,7 +211,7 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms, w_sec):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare Ollama model efficiency.")
+    parser = argparse.ArgumentParser(description="Compare (OpenAI)-compatible model efficiency.")
     parser.add_argument("-p", "--prompt", required=True, help="The prompt to send to the models.")
     parser.add_argument("--w_ts", type=float, default=0.3, help="Weight for Token Speed (default: 0.3)")
     parser.add_argument("--w_is", type=float, default=0.3, help="Weight for Intelligency (default: 0.3)")
@@ -197,8 +225,8 @@ def main():
         print(f"Error: Weights must sum to 1.0 (current total: {total_weight})")
         return
 
-    print("Fetching available Ollama models...")
-    models = list_ollama_models()
+    print("Fetching available (OpenAI)-compatible models...")
+    models = list_compatible_models()
     if not models:
         return
 
