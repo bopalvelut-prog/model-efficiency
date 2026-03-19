@@ -19,6 +19,7 @@ This script will:
 ## Current Records
 | Hardware | CPU | RAM | Model | Speed | RAM | Link |
 |----------|-----|-----|-------|-------|-----|------|
-| eMachines E727 | Pentium T4500 2.3GHz | 4GB DDR2 | Qwen2.5-1.5B Q4 | 0.04 tok/s | 145MB | [e727-local-ai](https://github.com/bopalvelut-prog/e727-local-ai) |
+| eMachines E727 | Pentium T4500 2.3GHz | 4GB DDR2 | Qwen2.5-1.5B Q4 | 1.0 tok/s | 145MB | [e727-local-ai](https://github.com/bopalvelut-prog/e727-local-ai) |
+| eMachines E727 | Celeron 1000M 1.8GHz | 5.6GB DDR3 | Qwen2.5-Coder-3B Q6 | 0.57 tok/s | 450MB | [e727-local-ai](https://github.com/bopalvelut-prog/e727-local-ai) |
 
-**Submit yours → Beat Pentium T4500!**
+**Submit yours → Beat Celeron 1000M!**
