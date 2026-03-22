@@ -314,6 +314,8 @@ def main():
     parser.add_argument("--report", action="store_true", help="Output as HTML report")
     parser.add_argument("--markdown", action="store_true", help="Output as Markdown table")
     parser.add_argument("-o", "--output", help="Save output to file")
+    parser.add_argument("--auto", action="store_true",
+                        help="Auto-score intelligence (heuristic) and skip all prompts")
 
     args = parser.parse_args()
 
@@ -351,9 +353,18 @@ def main():
         response_metrics = chat_fn(model_name, args.prompt)
         if response_metrics:
             print(f"Tokens/second: {response_metrics['tokens_per_second']:.2f}")
-            is_score = get_intelligency_score()
-            if is_score == 0:
-                is_score = None
+            if args.auto:
+                # Heuristic: longer, more diverse responses score higher
+                resp = response_metrics.get("response", "")
+                word_count = len(resp.split())
+                unique_words = len(set(resp.lower().split()))
+                diversity = unique_words / max(word_count, 1)
+                is_score = min(5.0, max(1.0, (word_count / 30) * (0.5 + diversity)))
+                print(f"Auto intelligence score: {is_score:.1f}")
+            else:
+                is_score = get_intelligency_score()
+                if is_score == 0:
+                    is_score = None
 
             raw_results.append({
                 "model_name": model_name,
@@ -387,7 +398,7 @@ def main():
 
     # Auto-downloader
     suggested_models = [r["suggested_tag"] for r in processed_sorted if r.get("suggested_tag")]
-    if suggested_models and not args.json and not args.report:
+    if suggested_models and not args.json and not args.report and not args.auto:
         print("\n--- Model Downloader ---")
         for idx, m in enumerate(suggested_models):
             print(f"[{idx+1}] {m}")
