@@ -20,7 +20,10 @@ def list_ollama_models():
     try:
         response = requests.get(f"{OLLAMA_API}/tags")
         response.raise_for_status()
-        return [{"name": m["name"], "size": m.get("size", 0)} for m in response.json()["models"]]
+        return [
+            {"name": m["name"], "size": m.get("size", 0)}
+            for m in response.json()["models"]
+        ]
     except requests.exceptions.RequestException as e:
         print(f"Error connecting to Ollama API: {e}")
         return []
@@ -95,6 +98,7 @@ def chat_llamacpp(model_name, prompt):
 # Scoring
 # ---------------------------------------------------------------------------
 
+
 def get_intelligency_score():
     """Prompts the user for an intelligence score."""
     while True:
@@ -147,8 +151,21 @@ def suggest_quantization(model_name, tokens_per_second):
     """Suggests quantization based on speed threshold."""
     if tokens_per_second is None:
         return "N/A", None
-    quants = ["q2_K", "q3_K_S", "q3_K_M", "q3_K_L", "q4_0", "q4_K_S", "q4_K_M",
-              "q5_0", "q5_K_S", "q5_K_M", "q6_K", "q8_0", "fp16"]
+    quants = [
+        "q2_K",
+        "q3_K_S",
+        "q3_K_M",
+        "q3_K_L",
+        "q4_0",
+        "q4_K_S",
+        "q4_K_M",
+        "q5_0",
+        "q5_K_S",
+        "q5_K_M",
+        "q6_K",
+        "q8_0",
+        "fp16",
+    ]
 
     current_quant = None
     base_name = model_name
@@ -176,7 +193,10 @@ def suggest_quantization(model_name, tokens_per_second):
     else:
         if idx < len(quants) - 1:
             suggested = quants[idx + 1]
-            return f"Fast (>=5t/s). Try {suggested} for quality", f"{base_name}-{suggested}"
+            return (
+                f"Fast (>=5t/s). Try {suggested} for quality",
+                f"{base_name}-{suggested}",
+            )
         return "Fast, highest quant already.", None
 
 
@@ -187,7 +207,9 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms, w_sec):
 
     token_speeds = [r["tokens_per_second"] for r in results if r["tokens_per_second"]]
     max_ts = max(token_speeds) if token_speeds else 1
-    min_ms = min(r["model_size"] for r in results if r["model_size"] > 0) if results else 1
+    min_ms = (
+        min(r["model_size"] for r in results if r["model_size"] > 0) if results else 1
+    )
 
     processed = []
     for r in results:
@@ -201,24 +223,29 @@ def calculate_combined_efficiency(results, w_ts, w_is, w_ms, w_sec):
         norm_ms = (min_ms / ms) if ms > 0 else 0
         norm_sec = (sec_score / 5.0) if sec_score else 0
 
-        combined = (norm_ts * w_ts) + (norm_is * w_is) + (norm_ms * w_ms) + (norm_sec * w_sec)
+        combined = (
+            (norm_ts * w_ts) + (norm_is * w_is) + (norm_ms * w_ms) + (norm_sec * w_sec)
+        )
         suggestion_text, suggested_tag = suggest_quantization(r["model_name"], ts)
         metadata = get_model_metadata(r["model_name"])
 
-        processed.append({
-            **r,
-            "combined_efficiency_score": combined,
-            "suggestion": suggestion_text,
-            "suggested_tag": suggested_tag,
-            "origin": metadata["origin"],
-            "license": metadata["license"],
-        })
+        processed.append(
+            {
+                **r,
+                "combined_efficiency_score": combined,
+                "suggestion": suggestion_text,
+                "suggested_tag": suggested_tag,
+                "origin": metadata["origin"],
+                "license": metadata["license"],
+            }
+        )
     return processed
 
 
 # ---------------------------------------------------------------------------
 # Output formatters
 # ---------------------------------------------------------------------------
+
 
 def format_table(results):
     header = f"{'Model':<25} {'Tokens/s':<10} {'Origin':<10} {'License':<18} {'Sec.':<5} {'Score':<7} {'Recommendation'}"
@@ -227,7 +254,9 @@ def format_table(results):
         ts_str = f"{r['tokens_per_second']:.1f}" if r["tokens_per_second"] else "N/A"
         sec_str = f"{r['security_score']:.1f}"
         score_str = f"{r['combined_efficiency_score']:.2f}"
-        lines.append(f"{r['model_name']:<25} {ts_str:<10} {r['origin']:<10} {r['license']:<18} {sec_str:<5} {score_str:<7} {r['suggestion']}")
+        lines.append(
+            f"{r['model_name']:<25} {ts_str:<10} {r['origin']:<10} {r['license']:<18} {sec_str:<5} {score_str:<7} {r['suggestion']}"
+        )
     return "\n".join(lines)
 
 
@@ -236,13 +265,17 @@ def format_json(results):
 
 
 def format_markdown(results):
-    lines = ["| Model | Tokens/s | Origin | License | Security | Score | Recommendation |",
-             "|-------|----------|--------|---------|----------|-------|----------------|"]
+    lines = [
+        "| Model | Tokens/s | Origin | License | Security | Score | Recommendation |",
+        "|-------|----------|--------|---------|----------|-------|----------------|",
+    ]
     for r in results:
         ts = f"{r['tokens_per_second']:.1f}" if r["tokens_per_second"] else "N/A"
         sec = f"{r['security_score']:.1f}"
         score = f"{r['combined_efficiency_score']:.2f}"
-        lines.append(f"| {r['model_name']} | {ts} | {r['origin']} | {r['license']} | {sec} | {score} | {r['suggestion']} |")
+        lines.append(
+            f"| {r['model_name']} | {ts} | {r['origin']} | {r['license']} | {sec} | {score} | {r['suggestion']} |"
+        )
     return "\n".join(lines)
 
 
@@ -252,11 +285,15 @@ def format_html(results, prompt=""):
         ts = f"{r['tokens_per_second']:.1f}" if r["tokens_per_second"] else "N/A"
         sec = f"{r['security_score']:.1f}"
         score = f"{r['combined_efficiency_score']:.2f}"
-        cls = "good" if r["combined_efficiency_score"] > 0.6 else ("mid" if r["combined_efficiency_score"] > 0.3 else "bad")
+        cls = (
+            "good"
+            if r["combined_efficiency_score"] > 0.6
+            else ("mid" if r["combined_efficiency_score"] > 0.3 else "bad")
+        )
         rows += f"""<tr>
-          <td>{r['model_name']}</td><td>{ts}</td><td>{r['origin']}</td>
-          <td>{r['license']}</td><td>{sec}</td><td class="{cls}">{score}</td>
-          <td>{r['suggestion']}</td>
+          <td>{r["model_name"]}</td><td>{ts}</td><td>{r["origin"]}</td>
+          <td>{r["license"]}</td><td>{sec}</td><td class="{cls}">{score}</td>
+          <td>{r["suggestion"]}</td>
         </tr>\n"""
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Model Efficiency Report</title>
@@ -283,15 +320,19 @@ def format_html(results, prompt=""):
 
 
 def pull_model(model_name):
-    """Pulls a model from Ollama registry."""
-    print(f"\nPulling {model_name}...")
+    """Load a model on the llama.cpp/prima.cpp server."""
+    print(f"\nLoading {model_name} on prima.cpp server...")
     try:
-        response = requests.post(f"{OLLAMA_API}/pull", json={"name": model_name, "stream": False})
+        response = requests.post(
+            f"http://{LLAMACPP_HOST}:{LLAMACPP_PORT}/v1/models/load",
+            json={"model": model_name},
+            timeout=120,
+        )
         response.raise_for_status()
-        print(f"Successfully pulled {model_name}")
+        print(f"Successfully loaded {model_name}")
         return True
     except Exception as e:
-        print(f"Failed to pull {model_name}: {e}")
+        print(f"Failed to load {model_name}: {e}")
         return False
 
 
@@ -299,23 +340,45 @@ def pull_model(model_name):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Compare model efficiency (Ollama or llama.cpp).")
-    parser.add_argument("-p", "--prompt", required=True, help="The prompt to send to the models.")
-    parser.add_argument("--backend", choices=["ollama", "llamacpp"], default="ollama",
-                        help="Inference backend (default: ollama)")
-    parser.add_argument("--llamacpp-host", default="localhost", help="llama.cpp server host")
-    parser.add_argument("--llamacpp-port", type=int, default=8080, help="llama.cpp server port")
-    parser.add_argument("--w_ts", type=float, default=0.3, help="Weight for Token Speed")
-    parser.add_argument("--w_is", type=float, default=0.3, help="Weight for Intelligence")
+    parser = argparse.ArgumentParser(
+        description="Compare model efficiency (Ollama or llama.cpp)."
+    )
+    parser.add_argument(
+        "-p", "--prompt", required=True, help="The prompt to send to the models."
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["ollama", "llamacpp"],
+        default="llamacpp",
+        help="Inference backend (default: llamacpp/prima.cpp)",
+    )
+    parser.add_argument(
+        "--llamacpp-host", default="localhost", help="llama.cpp server host"
+    )
+    parser.add_argument(
+        "--llamacpp-port", type=int, default=8080, help="llama.cpp server port"
+    )
+    parser.add_argument(
+        "--w_ts", type=float, default=0.3, help="Weight for Token Speed"
+    )
+    parser.add_argument(
+        "--w_is", type=float, default=0.3, help="Weight for Intelligence"
+    )
     parser.add_argument("--w_ms", type=float, default=0.2, help="Weight for Model Size")
     parser.add_argument("--w_sec", type=float, default=0.2, help="Weight for Security")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--report", action="store_true", help="Output as HTML report")
-    parser.add_argument("--markdown", action="store_true", help="Output as Markdown table")
+    parser.add_argument(
+        "--markdown", action="store_true", help="Output as Markdown table"
+    )
     parser.add_argument("-o", "--output", help="Save output to file")
-    parser.add_argument("--auto", action="store_true",
-                        help="Auto-score intelligence (heuristic) and skip all prompts")
+    parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="Auto-score intelligence (heuristic) and skip all prompts",
+    )
 
     args = parser.parse_args()
 
@@ -366,18 +429,22 @@ def main():
                 if is_score == 0:
                     is_score = None
 
-            raw_results.append({
-                "model_name": model_name,
-                "tokens_per_second": response_metrics["tokens_per_second"],
-                "intelligency_score": is_score,
-                "security_score": sec_score,
-                "model_size": model_dict.get(model_name, 0),
-            })
+            raw_results.append(
+                {
+                    "model_name": model_name,
+                    "tokens_per_second": response_metrics["tokens_per_second"],
+                    "intelligency_score": is_score,
+                    "security_score": sec_score,
+                    "model_size": model_dict.get(model_name, 0),
+                }
+            )
 
     processed = calculate_combined_efficiency(
         raw_results, args.w_ts, args.w_is, args.w_ms, args.w_sec
     )
-    processed_sorted = sorted(processed, key=lambda x: x["combined_efficiency_score"], reverse=True)
+    processed_sorted = sorted(
+        processed, key=lambda x: x["combined_efficiency_score"], reverse=True
+    )
 
     # Output
     if args.json:
@@ -397,12 +464,16 @@ def main():
         print(f"\n--- Results Summary ---\n{output}")
 
     # Auto-downloader
-    suggested_models = [r["suggested_tag"] for r in processed_sorted if r.get("suggested_tag")]
+    suggested_models = [
+        r["suggested_tag"] for r in processed_sorted if r.get("suggested_tag")
+    ]
     if suggested_models and not args.json and not args.report and not args.auto:
         print("\n--- Model Downloader ---")
         for idx, m in enumerate(suggested_models):
-            print(f"[{idx+1}] {m}")
-        choice = input("\nEnter model numbers to download (e.g. 1,3) or Enter to skip: ")
+            print(f"[{idx + 1}] {m}")
+        choice = input(
+            "\nEnter model numbers to download (e.g. 1,3) or Enter to skip: "
+        )
         if choice:
             try:
                 indices = [int(i.strip()) - 1 for i in choice.split(",")]
