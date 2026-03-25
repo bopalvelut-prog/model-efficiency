@@ -2,8 +2,6 @@ import requests
 import json
 import argparse
 import time
-import sys
-import os
 from datetime import datetime
 
 # ---------------------------------------------------------------------------
